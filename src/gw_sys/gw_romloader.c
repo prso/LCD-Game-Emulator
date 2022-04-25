@@ -45,14 +45,8 @@ __license__ = "GPLv3"
 #include "gw_type_defs.h"
 #include "gw_system.h"
 #include "gw_romloader.h"
-#include "hw_jpeg_decoder.h"
 
 
-/* instances for JPEG decoder */
-// Internal buffer for hardware JPEG decoder 
-#define JPEG_BUFFER_SIZE ((uint32_t)(GW_SCREEN_WIDTH * GW_SCREEN_HEIGHT * 3 / 2))
-
-static uint8_t JPEG_Buffer[JPEG_BUFFER_SIZE] __attribute__((aligned(4)));
 
 //ROM in RAM
 // size is 2 or 4 images in 16bits format (1 screen or 2screen swapping)
@@ -265,42 +259,8 @@ bool gw_romloader_rom2ram()
       printf("RGB565 background\n");
       gw_background = (unsigned short *)&GW_ROM[gw_head.background_pixel];
    }
-   // otherwise we get the background from JPEG file
-   else if((rom_size_compressed_src+8) != ROM_DATA_LENGTH)
-   {
-      printf("JPEG background?\n");
-
-      /* JPEG decoder : from Flash to RAM */
-      uint32_t JpegSrc;
-      uint32_t FrameDst;
-
-      JpegSrc = (uint32_t)&ROM_DATA[rom_size_compressed_src+8];
-
-      /*set destination RGB image, 32 bits aligned */
-      FrameDst = (uint32_t)&GW_ROM[rom_size_src + 4 - (rom_size_src % 4)];
-
-      /* cleanup Frame buffer with black color (in case of background cropped) */
-      memset((unsigned char *)FrameDst, 0x0, GW_SCREEN_HEIGHT*GW_SCREEN_WIDTH*2);
-
-      assert(JPEG_DecodeToFrameInit((uint32_t)&JPEG_Buffer,JPEG_BUFFER_SIZE) == 0);
-    
-      // get jpeg image size
-
-      //determine center position
-      uint32_t xImg=0, yImg=0, wImg=0,hImg=0;
-      assert (0 == JPEG_DecodeGetSize(JpegSrc, &wImg, &hImg));
-
-      xImg = ( GW_SCREEN_WIDTH - wImg )/2;
-      yImg = ( GW_SCREEN_HEIGHT - hImg )/2;
-
-      // decode background and copy it in the righ place in the frame buffer
-      assert( 0 == JPEG_DecodeToFrame(JpegSrc, FrameDst, xImg, yImg, 0xFF));
-
-      assert(JPEG_DecodeDeInit() == 0);
-
-      /* set the address of RGB background  */
-      gw_background = (unsigned short *)(FrameDst);
-   }
+   else
+      gw_background    = (unsigned short*) &GW_ROM[rom_size_src];
 
    /* Set up pointers to objects base */
    gw_segments = (unsigned char *)&GW_ROM[gw_head.segments_pixel];
